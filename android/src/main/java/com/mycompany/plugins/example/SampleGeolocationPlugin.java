@@ -11,7 +11,6 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
-import com.mycompany.plugins.example.GPS.Geolocation;
 
 @CapacitorPlugin(
         name = "SampleGeolocation",
