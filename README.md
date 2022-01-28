@@ -18,6 +18,7 @@ npx cap sync
 * [`gpsStart()`](#gpsstart)
 * [`gpsStop()`](#gpsstop)
 * [`openGoogleMap()`](#opengooglemap)
+* [`addListener('abnormal_vitalSign', ...)`](#addlistenerabnormal_vitalsign)
 * [Interfaces](#interfaces)
 
 </docgen-index>
@@ -76,6 +77,22 @@ openGoogleMap() => Promise<{ result: String; }>
 ```
 
 **Returns:** <code>Promise&lt;{ result: <a href="#string">String</a>; }&gt;</code>
+
+--------------------
+
+
+### addListener('abnormal_vitalSign', ...)
+
+```typescript
+addListener(eventName: 'abnormal_vitalSign', listenerFunc: (value: any) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
+```
+
+| Param              | Type                                 |
+| ------------------ | ------------------------------------ |
+| **`eventName`**    | <code>'abnormal_vitalSign'</code>    |
+| **`listenerFunc`** | <code>(value: any) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
 --------------------
 
@@ -147,5 +164,12 @@ Allows manipulation and formatting of text strings and determination and locatio
 | ----------- | ------------------- |
 | **`index`** | <code>number</code> |
 | **`input`** | <code>string</code> |
+
+
+#### PluginListenerHandle
+
+| Prop         | Type                                      |
+| ------------ | ----------------------------------------- |
+| **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
 
 </docgen-api>

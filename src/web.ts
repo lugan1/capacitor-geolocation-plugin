@@ -1,4 +1,4 @@
-import { WebPlugin } from '@capacitor/core';
+import {WebPlugin} from '@capacitor/core';
 
 import type { SampleGeolocationPlugin } from './definitions';
 
@@ -42,4 +42,5 @@ export class SampleGeolocationWeb extends WebPlugin implements SampleGeolocation
             }
         );
     }
+
 }

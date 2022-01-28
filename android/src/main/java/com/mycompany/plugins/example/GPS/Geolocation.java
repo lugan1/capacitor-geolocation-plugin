@@ -9,7 +9,7 @@ import android.net.Uri;
 import android.provider.Settings;
 import android.util.Log;
 
-import androidx.appcompat.app.AlertDialog;
+import android.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -27,10 +27,15 @@ import java.util.Collections;
 
 public class Geolocation {
 
+  public static final int LOCATION_IN_AREA = 0;
+  public static final int LOCATION_OUT_CIRCLE = 1;
+  public static final int LOCATION_OUT_ALTITUDE = 2;
+  public static final int LOCATION_OUT_CIRCLE_AND_ALTITUDE = 3;
+
+
   public boolean permission_granted = false;
   public boolean GPS_Enable = false;
   public boolean googlePlayService_Enable = false;
-
 
   private LocationRequest locationRequest;
   private FusedLocationProviderClient fusedLocationProviderClient;
@@ -103,7 +108,7 @@ public class Geolocation {
   // 설정된 GPS 값이 디바이스에서 설정가능한지 확인. 비동기적으로 값이 들어오기 때문에 task 를 받아서 이벤트 처리 필요
   public Task<LocationSettingsResponse> checkGPS_Enabled(Context context) {
     locationRequest = LocationRequest.create();
-    locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
+    locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
     locationRequest.setInterval(2000L);
     locationRequest.setFastestInterval(1000L);
 
@@ -122,12 +127,35 @@ public class Geolocation {
 
 
   // Rx 패턴처럼 Task 객체를 반환하면 받은쪽에서 리스너 등록해서 사용
-  public Task<Location> GPS_START(Context context) {
+  public Task<Location> getCurrentLocation(Context context) {
     checkPermission(context);
 
     fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context);
     Task<Location> task = fusedLocationProviderClient.getCurrentLocation(LocationRequest.PRIORITY_HIGH_ACCURACY,cts.getToken());
     return task;
+  }
+
+
+  public int is_containsLocation(double latitude, double longitude, double altitdue, QuarantineArea quarantineArea){
+    float[] distance = new float[2];
+    Location.distanceBetween(latitude, longitude, quarantineArea.latitude, quarantineArea.longitude, distance);
+    if((distance[0] > quarantineArea.radius) && (altitdue >= quarantineArea.max_altitudeLimit || altitdue <= quarantineArea.min_altitdueLimit)) {
+      Log.v("GEOFENCE","원 밖에있음 + 고도 이탈 : "+distance[0]);
+      return 3;
+    }
+    else if(distance[0] > quarantineArea.radius){
+      Log.v("GEOFENCE","원 밖에 있음 : "+distance[0]);
+      return 1;
+    }
+    else if(altitdue >= quarantineArea.max_altitudeLimit || altitdue <= quarantineArea.min_altitdueLimit) {
+      Log.v("GEOFENCE","고도 이탈 : 현재 고도"+altitdue);
+      return 2;
+    }
+    else {
+      Log.v("GEOFENCE","원 안에 있음 : "+distance[0]);
+      return 0;
+    }
+
   }
 
   /*private LocationCallback locationCallback = new LocationCallback() {

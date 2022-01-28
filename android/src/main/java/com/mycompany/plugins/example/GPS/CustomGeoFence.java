@@ -79,7 +79,7 @@ public class CustomGeoFence {
     }
 
     public void addGeofences(Context context) {
-        new Geolocation().GPS_START(context).addOnSuccessListener(new OnSuccessListener<Location>() {
+        new Geolocation().getCurrentLocation(context).addOnSuccessListener(new OnSuccessListener<Location>() {
             @Override
             public void onSuccess(Location location) {
                 geofencingClient = LocationServices.getGeofencingClient(context);

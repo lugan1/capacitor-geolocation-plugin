@@ -26,13 +26,12 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.mycompany.plugins.example.GPS.CustomGeoFence;
 import com.mycompany.plugins.example.GPS.Geolocation;
+import com.mycompany.plugins.example.GPS.QuarantineArea;
 
 public class GoogleMapActivity extends AppCompatActivity implements OnMapReadyCallback {
-    public GoogleMapActivity() {
+    SampleGeolocationPlugin sampleGeolocationPlugin;
 
-
-    }
-
+    public GoogleMapActivity() { }
 
     public static void setGoogleMapObj(GoogleMap googleMapObj) {
         GoogleMapActivity.googleMapObj = googleMapObj;
@@ -52,6 +51,8 @@ public class GoogleMapActivity extends AppCompatActivity implements OnMapReadyCa
     static int r;
     static Circle circle;
 
+    static QuarantineArea quarantineArea;
+
 
     public static Geolocation getGeolocation() {
         return geolocation;
@@ -68,9 +69,6 @@ public class GoogleMapActivity extends AppCompatActivity implements OnMapReadyCa
 
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-
-
-        Circle circle2 = new Circle();
 
         CustomGeoFence customGeoFence = new CustomGeoFence();
 
@@ -100,13 +98,13 @@ public class GoogleMapActivity extends AppCompatActivity implements OnMapReadyCa
 
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
-        geolocation.GPS_START(getApplicationContext()).addOnSuccessListener(new OnSuccessListener<Location>() {
+        geolocation.getCurrentLocation(getApplicationContext()).addOnSuccessListener(new OnSuccessListener<Location>() {
             @Override
             public void onSuccess(Location location) {
                 a = location.getLatitude();
                 b = location.getLongitude();
                 r = 20;
-
+                quarantineArea = new QuarantineArea(a, b, r, location.getAltitude());
                 CircleOptions circleOptions = new CircleOptions()
                         .center(new LatLng(location.getLatitude(), location.getLongitude()))
                         .radius(20); // In meters
@@ -119,7 +117,7 @@ public class GoogleMapActivity extends AppCompatActivity implements OnMapReadyCa
                 circle = googleMap.addCircle(circleOptions);
 
                 googleMap.moveCamera(CameraUpdateFactory.newLatLng(new LatLng(location.getLatitude(), location.getLongitude())));
-                googleMap.animateCamera(CameraUpdateFactory.zoomTo(15));
+                googleMap.animateCamera(CameraUpdateFactory.zoomTo(18));
                 googleMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
                 setGoogleMapObj(googleMap);
             }
@@ -138,12 +136,33 @@ public class GoogleMapActivity extends AppCompatActivity implements OnMapReadyCa
             while (!isCancelled()){
                 try {
                     Thread.sleep(3000L);
-                    geolocation.GPS_START(context[0]).addOnSuccessListener(new OnSuccessListener<Location>() {
+                    geolocation.getCurrentLocation(context[0]).addOnSuccessListener(new OnSuccessListener<Location>() {
                         @Override
                         public void onSuccess(Location location) {
-                            Log.v("GEOTEST","현재 고도 : "+location.getAltitude()+" 경도(longitude):"+location.getLongitude()+"  위도(laitude):"+location.getLatitude());
+                            //Log.v("GEOTEST","현재 고도 : "+location.getAltitude()+" 경도(longitude):"+location.getLongitude()+"  위도(laitude):"+location.getLatitude());
 
-                            float[] distance = new float[2];
+                            int is_containsLocation;
+
+                            ((SampleGeolocationPlugin)SampleGeolocationPlugin.plugin).listenerTest();
+
+                            is_containsLocation = geolocation.is_containsLocation(location.getLatitude(), location.getLongitude(), location.getAltitude(), quarantineArea);
+                            switch (is_containsLocation){
+                                case Geolocation.LOCATION_IN_AREA :
+                                    Toast.makeText(context[0], "원 안에 들어있음. 고도 : "+location.getAltitude()+"\n최대 고도 : "+quarantineArea.getMax_altitudeLimit()+"\n최저 고도 : "+quarantineArea.getMin_altitdueLimit(), Toast.LENGTH_SHORT).show();
+                                    break;
+                                case Geolocation.LOCATION_OUT_CIRCLE:
+                                    Toast.makeText(context[0], "원 밖에 나가있음. 고도 : "+location.getAltitude()+"\n최대 고도 : "+quarantineArea.getMax_altitudeLimit()+"\n최저 고도 : "+quarantineArea.getMin_altitdueLimit(), Toast.LENGTH_SHORT).show();
+                                    break;
+                                case Geolocation.LOCATION_OUT_CIRCLE_AND_ALTITUDE:
+                                    Toast.makeText(context[0], "원 밖에 나가있음+고도 이탈중 : "+location.getAltitude()+"\n최대 고도 : "+quarantineArea.getMax_altitudeLimit()+"\n최저 고도 : "+quarantineArea.getMin_altitdueLimit(), Toast.LENGTH_SHORT).show();
+                                    break;
+                                case Geolocation.LOCATION_OUT_ALTITUDE:
+                                    Toast.makeText(context[0], "고도이탈. 현재 고도 : "+location.getAltitude()+"\n최대 고도 : "+quarantineArea.getMax_altitudeLimit()+"\n최저 고도 : "+quarantineArea.getMin_altitdueLimit(), Toast.LENGTH_SHORT).show();
+                                    break;
+                            }
+
+
+/*                            float[] distance = new float[2];
                             Location.distanceBetween(location.getLatitude(), location.getLongitude(), a, b, distance);
 
                             if( distance[0] > r){
@@ -152,7 +171,7 @@ public class GoogleMapActivity extends AppCompatActivity implements OnMapReadyCa
                             } else{
                                 Log.v("GEOFENCE","원 안에 있음 : "+distance[0]);
                                 Toast.makeText(context[0], "원 안에 있음", Toast.LENGTH_SHORT).show();
-                            }
+                            }*/
                         }
                     });
                 }catch (InterruptedException exception){
@@ -164,13 +183,28 @@ public class GoogleMapActivity extends AppCompatActivity implements OnMapReadyCa
         }
     }
 
-    boolean is_containsLocation(double x, double y, double a, double b, double r){
+    boolean is_containsLocation(double latitude, double longitude, double circle_latitude, double circle_longitude, int circle_radius){
+        float[] distance = new float[2];
+        Location.distanceBetween(latitude, longitude, circle_latitude, circle_longitude, distance);
+
+        if( distance[0] > circle_radius){
+            Log.v("GEOFENCE","원 밖에 있음 : "+distance[0]);
+            //Toast.makeText(context[0], "원 밖에 있음", Toast.LENGTH_SHORT).show();
+            return false;
+        } else{
+            Log.v("GEOFENCE","원 안에 있음 : "+distance[0]);
+            //Toast.makeText(context[0], "원 안에 있음", Toast.LENGTH_SHORT).show();
+            return true;
+        }
+    }
+
+/*    boolean is_containsLocation(double x, double y, double a, double b, double r){
         if(Math.pow((x-a),2) + Math.pow((y-b),2) <= Math.pow(r,2)){
             return true;
         }
         else{
             return false;
         }
-    }
+    }*/
 
 }
