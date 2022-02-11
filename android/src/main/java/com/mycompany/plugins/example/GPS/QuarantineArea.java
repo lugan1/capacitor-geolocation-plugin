@@ -7,6 +7,7 @@ public class QuarantineArea {
     double longitude;
     int radius;
     String address;
+    final static int CellID = 768781;
 
     int altitudeLimit = 3;
 

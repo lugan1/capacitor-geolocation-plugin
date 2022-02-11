@@ -1,15 +1,29 @@
 package com.mycompany.plugins.example.GPS;
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.location.Location;
 import android.net.Uri;
+import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.provider.Settings;
+import android.provider.Telephony;
+import android.telephony.TelephonyManager;
+import android.telephony.gsm.GsmCellLocation;
 import android.util.Log;
 
 import android.app.AlertDialog;
+import android.widget.Toast;
+
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -22,6 +36,7 @@ import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.location.SettingsClient;
 import com.google.android.gms.tasks.CancellationTokenSource;
 import com.google.android.gms.tasks.Task;
+import com.mycompany.plugins.example.SampleGeolocationPlugin;
 
 import java.util.Collections;
 
@@ -31,9 +46,10 @@ public class Geolocation {
   public static final int LOCATION_OUT_CIRCLE = 1;
   public static final int LOCATION_OUT_ALTITUDE = 2;
   public static final int LOCATION_OUT_CIRCLE_AND_ALTITUDE = 3;
+  public static final int CELLID_CHANGED = 4;
 
 
-  public boolean permission_granted = false;
+
   public boolean GPS_Enable = false;
   public boolean googlePlayService_Enable = false;
 
@@ -51,10 +67,10 @@ public class Geolocation {
     int permssion = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION);
     if (permssion == PackageManager.PERMISSION_GRANTED) {
       // 권한이 허용 된 상태라면, GPS가 이용가능한 상태인지 확인
-      permission_granted = true;
+      return;
     } else {
       // 권한이 허용된 상태가 아니라면, 얼럿을 띄워서 권한 요청을 한다.
-      AlertDialog.Builder builder = new AlertDialog.Builder(context);
+/*      AlertDialog.Builder builder = new AlertDialog.Builder(SampleGeolocationPlugin.plugin.getBridge().getActivity());
       builder.setTitle("위치 권한이 꺼져있습니다.");
       builder.setMessage("[권한] 설정 -> [위치] 권한을 허용해야 합니다.");
       builder.setPositiveButton("설정으로 가기", (dialog, which) -> {
@@ -65,7 +81,7 @@ public class Geolocation {
         context.startActivity(intent);
       });
       AlertDialog alertDialog = builder.create();
-      alertDialog.show();
+      alertDialog.show();*/
     }
   }
 
@@ -129,34 +145,73 @@ public class Geolocation {
   // Rx 패턴처럼 Task 객체를 반환하면 받은쪽에서 리스너 등록해서 사용
   public Task<Location> getCurrentLocation(Context context) {
     checkPermission(context);
-
     fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context);
-    Task<Location> task = fusedLocationProviderClient.getCurrentLocation(LocationRequest.PRIORITY_HIGH_ACCURACY,cts.getToken());
+    Task<Location> task = fusedLocationProviderClient.getCurrentLocation(LocationRequest.PRIORITY_HIGH_ACCURACY, cts.getToken());
     return task;
   }
 
 
-  public int is_containsLocation(double latitude, double longitude, double altitdue, QuarantineArea quarantineArea){
+  public int is_containsLocation(double latitude, double longitude, double altitdue, QuarantineArea quarantineArea, Context context) {
     float[] distance = new float[2];
     Location.distanceBetween(latitude, longitude, quarantineArea.latitude, quarantineArea.longitude, distance);
-    if((distance[0] > quarantineArea.radius) && (altitdue >= quarantineArea.max_altitudeLimit || altitdue <= quarantineArea.min_altitdueLimit)) {
-      Log.v("GEOFENCE","원 밖에있음 + 고도 이탈 : "+distance[0]);
+    if ((distance[0] > quarantineArea.radius) && (altitdue >= quarantineArea.max_altitudeLimit || altitdue <= quarantineArea.min_altitdueLimit)) {
+      Log.v("GEOFENCE", "원 밖에있음 + 고도 이탈 : " + distance[0]);
       return 3;
-    }
-    else if(distance[0] > quarantineArea.radius){
-      Log.v("GEOFENCE","원 밖에 있음 : "+distance[0]);
+    } else if (distance[0] > quarantineArea.radius) {
+      Log.v("GEOFENCE", "원 밖에 있음 : " + distance[0]);
       return 1;
-    }
-    else if(altitdue >= quarantineArea.max_altitudeLimit || altitdue <= quarantineArea.min_altitdueLimit) {
-      Log.v("GEOFENCE","고도 이탈 : 현재 고도"+altitdue);
+    } else if (altitdue >= quarantineArea.max_altitudeLimit || altitdue <= quarantineArea.min_altitdueLimit) {
+      Log.v("GEOFENCE", "고도 이탈 : 현재 고도" + altitdue);
       return 2;
-    }
-    else {
-      Log.v("GEOFENCE","원 안에 있음 : "+distance[0]);
+    } else if (getCurrentCellId(context) != QuarantineArea.CellID){
+      Log.v("GEOFENCE", "CELL ID 변경됨");
+      return Geolocation.CELLID_CHANGED;
+    } else {
+      Log.v("GEOFENCE", "원 안에 있음 : " + distance[0]);
       return 0;
     }
-
   }
+
+  public void getCurrentPressure(Context context) {
+    SensorManager sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
+    Sensor pressureSensor = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE);
+
+    SensorEventListener sensorEventListener = new SensorEventListener() {
+      @Override
+      public void onSensorChanged(SensorEvent event) {
+        //센서에서 새로운 값을 보고할때 콜백. SensorEvent => 데이터의 정확도, 데이터를 생성한 센서, 타임스탬프등 표시
+        Log.v("SALTITUDE", "현재 압력 : " + event.values[0]);
+
+        float altitude = SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, event.values[0]);
+
+        Log.v("SALTITUDE", "현재 기압고도 : " + altitude);
+        sensorManager.unregisterListener(this, pressureSensor);
+        //호출당 한번의 값만 필요하기 때문의 값을 얻으면 콜백 바로해제
+      }
+
+      @Override
+      public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        //센서의 정확도가 변경될때 콜백
+
+      }
+    };
+
+    sensorManager.registerListener(sensorEventListener, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL);
+  }
+
+  public int getCurrentCellId(Context context) {
+    TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
+    if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+      return 0;
+    }
+    GsmCellLocation gsmCellLocation = (GsmCellLocation) telephonyManager.getCellLocation();
+    int cellID = gsmCellLocation.getCid();
+    int lac = gsmCellLocation.getLac();
+    int psc = gsmCellLocation.getPsc();
+    Toast.makeText(context, "현재 기지국 : "+cellID+" lac : "+lac+" psc : "+psc, Toast.LENGTH_LONG).show();
+    return cellID;
+  }
+
 
   /*private LocationCallback locationCallback = new LocationCallback() {
     @RequiresApi(api = Build.VERSION_CODES.O)
