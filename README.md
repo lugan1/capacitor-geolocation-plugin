@@ -1,5 +1,7 @@
 # 캐퍼시터 GPS 플러그인  
 
+Android, iOS 의 GPS 기능을 네이티브로 구현한 플러그인
+
 ## Install
 
 ```bash
